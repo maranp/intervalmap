@@ -1,147 +1,108 @@
-#include <assert.h>
+/*
+ * mymap.cpp
+ *
+ *  Created on: 02-Nov-2016
+ *      Author: maran
+ */
+
 #include <map>
 #include <limits>
 #include <iostream>
+#include <iterator>
 
-template<class K, class V>
-class interval_map {
-    friend void IntervalMapTest();
+template <typename K,typename V>
+class mymap {
+public:
+	mymap(V const & val) {
+		m_map.insert(m_map.begin(),
+					std::make_pair(std::numeric_limits<K>::min(), val));
+	}
+	V & operator [] (K const & key) {
+		return (--m_map.upper_bound(key))->second;
+	}
+
+	void assign(K const & keyBegin, K const & keyEnd, V const & val) {
+		std::cout << "(" << keyBegin << "," << keyEnd << "," << val << ")\n";
+
+		using iterator_t = typename std::map<K, V>::iterator;
+
+		iterator_t lbBegin = m_map.lower_bound(keyBegin); // the first entry in the map whose key is >= keyBegin
+		iterator_t ubBegin = m_map.upper_bound(keyBegin); // the first entry in the map whose key is > keyBegin
+		iterator_t delBegin;
+		K searchBeginKey;
+		delBegin = lbBegin; // the iterator from where the deletion of entry should start
+		searchBeginKey = lbBegin->first; // set the search iterator to an entry earlier to where the new key will be inserted.
+										 // this helps to merge the map if the values of consequtive entries match
+		if (--lbBegin != m_map.end()) {
+			searchBeginKey = lbBegin->first;
+		}
+
+		iterator_t lbEnd = m_map.lower_bound(keyEnd);
+		iterator_t ubEnd = m_map.upper_bound(keyEnd);
+		iterator_t delEnd;
+		K searchEndKey;
+		if (lbEnd == ubEnd) // the condition is true when keyEnd does not match with any key.
+			--lbEnd;
+		delEnd = lbEnd;
+		V tailVal = delEnd->second; // the value to be set for the last entry in the modified range.
+		searchEndKey = lbEnd->first;
+
+		m_map.erase(delBegin, ++delEnd); // end is open interval so, advance the iterator
+
+		m_map.insert(std::begin(m_map), std::make_pair(keyBegin, val));
+		m_map.insert(std::begin(m_map), std::make_pair(keyEnd, tailVal));
+
+		iterator_t it = m_map.find(searchBeginKey); //searchBegin;
+		V prevVal = it->second;
+		it++;
+		iterator_t endIt = m_map.find(searchEndKey);
+		endIt++;
+		while (it != endIt) {
+			if (it->second == prevVal) {
+				iterator_t delIt = it;
+				it++;
+				m_map.erase(delIt);
+			} else {
+				prevVal = it->second;
+				it++;
+			}
+		}
+	}
+
+	void test_interval_map() {
+		m_map.insert(std::make_pair(1, 'b'));
+		m_map.insert(std::make_pair(4, 'c'));
+		m_map.insert(std::make_pair(7, 'd'));
+		m_map.insert(std::make_pair(10, 'e'));
+		m_map.insert(std::make_pair(13, 'a'));
+	}
+
+	// a print function for debugging
+	void show() {
+		std::cout << "show" << std::endl;
+		for(auto entry : m_map) {
+			std::cout << entry.first << entry.second << std::endl;
+		}
+	}
 
 private:
-    std::map<K,V> m_map;
-
-public:
-    // constructor associates whole range of K with val by inserting (K_min, val)
-    // into the map
-    interval_map( V const& val) {
-      
-      m_map.insert(m_map.begin(),std::make_pair(std::numeric_limits<K>::lowest(),val));
-    };
-
-    // Assign value val to interval [keyBegin, keyEnd). 
-    // Overwrite previous values in this interval. 
-    // Do not change values outside this interval.
-    // Conforming to the C++ Standard Library conventions, the interval 
-    // includes keyBegin, but excludes keyEnd.
-    // If !( keyBegin < keyEnd ), this designates an empty interval, 
-    // and assign must do nothing.
-
-    // look-up of the value associated with key
-    V const & operator[]( K const& key ) const {
-        return ( --m_map.upper_bound(key) )->second;
-    }
-
-    void assign( K const& keyBegin, K const& keyEnd, const V& val ) {
-    	typedef typename std::map<K, V>::iterator iterator_t;
-
-    	if (keyBegin >= keyEnd)
-    		return;
-
-    	V upval = this->operator[](keyBegin); //new upper interval value right now
-    	iterator_t idx = m_map.upper_bound(keyBegin);
-    	idx--;
-
-    	V upkey = idx->first + 1; //new upper interval key right now
-
-    	if (idx->first != keyBegin)
-    		idx++;
-
-    	iterator_t end = m_map.lower_bound(keyEnd);
-    	iterator_t tempit = idx;
-
-
-    	while (idx != end) {
-    		std::cout << "KK, V:" << idx->first << "," << idx->second << std::endl;
-    		upval = idx->second;
-    		upkey = idx->first + 1;
-    		tempit++;
-    		m_map.erase(idx);
-    		idx = tempit;
-    	}
-
-    	m_map.insert(std::make_pair(keyBegin, val));
-    	iterator_t mergeit = m_map.upper_bound(keyBegin);
-    	mergeit--; mergeit--;
-    	if (mergeit->second == val) {
-    		mergeit++;
-    		m_map.erase(mergeit);
-    	}
-
-    	m_map.insert(std::make_pair(keyEnd, upval));
-    	mergeit = m_map.upper_bound(keyBegin);
-    	mergeit--; mergeit--;
-    	if (mergeit->second == val) {
-    		mergeit++;
-    		upkey = mergeit->first + 1;
-    		m_map.erase(mergeit);
-    		m_map.insert(std::make_pair(upkey, upval));
-    	}
-    }
-
-  void insertor(K const &key, V const& val) {
-    m_map.insert(std::make_pair(key, val));
-  }
-    
-  void show() {
-      for (typename std::map<K, V>::iterator it = m_map.begin();
-	   it != m_map.end(); it++) {
-	std::cout << "K, V:" << it->first << "," << it->second << std::endl;
-      }
-  }
+	std::map<K,V> m_map;
 };
 
-void myconstruct(interval_map<unsigned int, char> &imap) {
-  //imap.insert(0, 'a');
-  imap.insertor(1, 'b');
-  imap.insertor(4, 'c');
-  imap.insertor(7, 'd');
-  imap.insertor(10, 'e');
-  imap.insertor(13, 'a');
-  
-  //imap.show();
-  // for (typename std::map<unsigned int, char>::iterator it = m_map.begin();
-  //      it != m_map.end(); it++) {
-  //   std::cout << "K, V:" << it->first << "," << it->second << std::endl;
-  // }
-
-}
-
-void lookuper(interval_map<unsigned int, char> &imap) {
-  for (int i = 0; i < 13; i++) {
-    std::cout << "lookup:" << i << "," << imap[i] << std::endl;
-  }
-}
-
-void IntervalMapTest() {
-  interval_map<unsigned int, char> imap = {'a'};
-  myconstruct(imap);
-
-  imap.show();
-
-  //imap.assign(3, 8, 'f');
-  //imap.assign(3, 8, 'b');
-  imap.assign(7, 10, 'c');
-  ////imap.assign(4, 8, 'f');
-  //imap.assign(4, 7, 'f');
-  //imap.assign(2, 6, 'f');
-  //imap.assign(11, 15, 'f');
-  //imap.assign(0, 5, 'f');
-  //imap.assign(5, 6, 'f');
-  
-  std::cout << "after assign \n";
-  imap.show();
-  //lookuper(imap);
-  return;
-}
-
-// Many solutions we receive are incorrect. Consider using a randomized test
-// to discover the cases that your implementation does not handle correctly.
-// We recommend to implement a function IntervalMapTest() here that tests the
-// functionality of the interval_map, for example using a map of unsigned int
-// intervals to char.
-
-int main(int argc, char* argv[]) {
-    IntervalMapTest();
-    std::cout <<"test\n";
-    return 0;
+int main() {
+	mymap<unsigned int, char> imap {'a'};
+	imap.test_interval_map();
+	imap.show();
+	//imap.assign(8, 10, 'k');
+	//imap.assign(8, 12, 'k');
+	//imap.assign(2, 12, 'k');
+	//imap.assign(2, 12, 'b');
+	//imap.assign(5, 12, 'b');
+	//imap.assign(4, 10, 'b');
+	//imap.assign(4, 12, 'b');
+	//imap.assign(7, 13, 'a');
+	//imap.assign(0, 10, 'e');
+	//imap.assign(0, 10, 'e');
+	imap.assign(1, 13, 'a');
+	imap.show();
 }
