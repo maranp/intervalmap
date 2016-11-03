@@ -8,6 +8,7 @@
 #include <map>
 #include <limits>
 #include <iostream>
+#include <iterator>
 
 template <typename K,typename V>
 class mymap {
@@ -25,18 +26,47 @@ public:
 
 		using iterator_t = typename std::map<K, V>::iterator;
 
-		iterator_t delBegin = m_map.upper_bound(keyBegin);
-		m_map.insert(delBegin, std::make_pair(keyBegin, val));
+		iterator_t lbBegin = m_map.lower_bound(keyBegin); // the first entry in the map whose key is >= keyBegin
+		iterator_t ubBegin = m_map.upper_bound(keyBegin); // the first entry in the map whose key is > keyBegin
+		iterator_t delBegin;
+		K searchBeginKey;
+		delBegin = lbBegin; // the iterator from where the deletion of entry should start
+		searchBeginKey = lbBegin->first; // set the search iterator to an entry earlier to where the new key will be inserted.
+										 // this helps to merge the map if the values of consequtive entries match
+		if (--lbBegin != m_map.end()) {
+			searchBeginKey = lbBegin->first;
+		}
 
-		// find the position after which keyEnd needs to be inserted
-		iterator_t delEnd = m_map.upper_bound(keyEnd);
-		delEnd--;
-		// the value at that position is the new value of keyEnd.
-		// So create an entry with keyEnd and value at the inserted position
-		m_map.insert(delEnd, std::make_pair(keyEnd, delEnd->second));
+		iterator_t lbEnd = m_map.lower_bound(keyEnd);
+		iterator_t ubEnd = m_map.upper_bound(keyEnd);
+		iterator_t delEnd;
+		K searchEndKey;
+		if (lbEnd == ubEnd) // the condition is true when keyEnd does not match with any key.
+			--lbEnd;
+		delEnd = lbEnd;
+		V tailVal = delEnd->second; // the value to be set for the last entry in the modified range.
+		searchEndKey = lbEnd->first;
 
-		if (delEnd->first != keyEnd) delEnd++;
-		m_map.erase(delBegin, delEnd);
+		m_map.erase(delBegin, ++delEnd); // end is open interval so, advance the iterator
+
+		m_map.insert(std::begin(m_map), std::make_pair(keyBegin, val));
+		m_map.insert(std::begin(m_map), std::make_pair(keyEnd, tailVal));
+
+		iterator_t it = m_map.find(searchBeginKey); //searchBegin;
+		V prevVal = it->second;
+		it++;
+		iterator_t endIt = m_map.find(searchEndKey);
+		endIt++;
+		while (it != endIt) {
+			if (it->second == prevVal) {
+				iterator_t delIt = it;
+				it++;
+				m_map.erase(delIt);
+			} else {
+				prevVal = it->second;
+				it++;
+			}
+		}
 	}
 
 	void test_interval_map() {
@@ -46,15 +76,13 @@ public:
 		m_map.insert(std::make_pair(10, 'e'));
 		m_map.insert(std::make_pair(13, 'a'));
 	}
+
+	// a print function for debugging
 	void show() {
 		std::cout << "show" << std::endl;
 		for(auto entry : m_map) {
 			std::cout << entry.first << entry.second << std::endl;
 		}
-
-//		for (auto i = 0; i < 14; i++) {
-//			std::cout << this->operator [](i) <<std::endl;
-//		}
 	}
 
 private:
@@ -66,9 +94,15 @@ int main() {
 	imap.test_interval_map();
 	imap.show();
 	//imap.assign(8, 10, 'k');
-	//map.assign(8, 12, 'k');
+	//imap.assign(8, 12, 'k');
 	//imap.assign(2, 12, 'k');
 	//imap.assign(2, 12, 'b');
-	imap.assign(4, 12, 'b');
+	//imap.assign(5, 12, 'b');
+	//imap.assign(4, 10, 'b');
+	//imap.assign(4, 12, 'b');
+	//imap.assign(7, 13, 'a');
+	//imap.assign(0, 10, 'e');
+	//imap.assign(0, 10, 'e');
+	imap.assign(1, 13, 'a');
 	imap.show();
 }
